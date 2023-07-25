@@ -1,56 +1,55 @@
-import paramiko
-import subprocess
-import csv
+import paramiko #SSH protokolunu kullanarak uzaktaki sunuculara bağlanmayı ve yonetmeyi saglar
+import subprocess #Yeni işlemler başlatmak ve sistem komutlarini calistirmak icin kullanilir
+import csv #CSV dosyalarini okumak ve yazmak icin kullanilir
 
 def ssh_connect():
-    remote_username = input("Lütfen hedef kullanıcı adını girin (Debian tarafında): ")
-    ip_address = input("Lütfen hedef IP adresini girin: ")
-    directory_name = input("Oluşturmak istediğiniz dizinin adı: ")
+    remote_username = input("Lutfen hedef kullanici adini girin: ")
+    ip_address = input("Lutfen hedef IP adresini girin: ")
+    directory_name = input("Olusturmak istediginiz dizinin adi: ")
 
-    password = input(f"{remote_username}@{ip_address} için parolanızı girin: ")
+    password = input(f"{remote_username}@{ip_address} icin parolanizi girin: ")
 
-    # Remote bağlantıyı oluşturmak için paramiko kullanımı
+    #Remote bağlantıyı oluşturmak için paramiko kullanımı
     ssh_client = paramiko.SSHClient()
     ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
     try:
-        print("SSH bağlantısı kuruluyor...")
+        #Girdileri kullanarak uzak sunucuya baglanti saglaniyor
+        print("SSH baglantisi kuruluyor...")
         ssh_client.connect(hostname=ip_address, username=remote_username, password=password, timeout=5)
-        print(f"{remote_username}@{ip_address} adresine bağlantı başarılı.")
+        print(f"{remote_username}@{ip_address} adresine baglanti basarili.")
 
-        # Uzakta dizini oluştur
-        print(f"{directory_name} adında bir dizin oluşturuluyor...")
+        #Uzak sunucuda dizini oluştur
+        print(f"{directory_name} adinda bir dizin olusturuluyor...")
         ssh_client.exec_command(f"mkdir {directory_name}")
-        print(f"{directory_name} adında bir dizin oluşturuldu.")
+        print(f"{directory_name} adinda bir dizin olusturuldu.")
 
-        # CSV dosyasını oluştur ve verileri yaz
+        #SSH sunucusunda SFTP oturumu acma ve CSV dosyasini olusturup ve verileri yazma
         csv_file_path = f"{directory_name}/data.csv"
         with ssh_client.open_sftp().file(csv_file_path, "w") as csv_file:
             csv_writer = csv.writer(csv_file)
             csv_writer.writerow(["Sinem", "23", "DevOps Engineer"])
-            # Burada dilediğiniz verileri CSV dosyasına yazabilirsiniz
-
         ssh_client.close()
 
-        # Oluşturulan CSV dosyasını sftp ile çek
+        #Olusturulan CSV dosyasini sftp ile cekmek icin
         print("CSV dosyası SFTP ile çekiliyor...")
         with paramiko.Transport((ip_address, 22)) as transport:
             transport.connect(username=remote_username, password=password)
             sftp = paramiko.SFTPClient.from_transport(transport)
-            sftp.get(csv_file_path, "localdeki_data.csv")
+            sftp.get(csv_file_path, "local_data.csv")
             sftp.close()
-        print("CSV dosyası başarıyla çekildi.")
+        print("CSV dosyası basariyla cekildi.")
 
-        # Debian sunucusunda kal
-        print("SSH oturumu başlatılıyor...")
-        subprocess.run(f"ssh {remote_username}@{ip_address}", shell=True, check=True)
+        #Debian sunucusunda kalmak istenirse asagidaki iki satirda yorumlari kaldirin
+        # print("SSH oturumu başlatılıyor...")
+        #subprocess.run(f"ssh {remote_username}@{ip_address}", shell=True, check=True)
     except paramiko.AuthenticationException:
-        print("Giriş başarısız. Kullanıcı adı veya şifre yanlış.")
+        print("Giris basarisiz. Kullanici adi veya sifre yanlis.")
     except paramiko.SSHException as e:
-        print(f"SSH Hatası: {e}")
+        print(f"SSH Hatasi: {e}")
     except Exception as e:
-        print(f"Hata oluştu: {e}")
+        print(f"Hata olustu: {e}")
 
 if __name__ == "__main__":
-    print("Debian WSL'e SSH ile bağlanma scriptine hoş geldiniz!")
+    print("SSH ile uzak sunucuya baglanma scriptine hos geldiniz!")
     ssh_connect()
