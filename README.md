@@ -24,7 +24,7 @@ pip install subprocess
 ```
 python3 ssh.py
 ```
-2. Ardından script, hedef kullanıcı adını, IP adresini ve oluşturmak istediğiniz dizinin adını isteyecektir.
+2. Ardından script, hedef kullanıcı adını, hedef IP adresini ve oluşturmak istediğiniz dizinin adını isteyecektir.
 3. Hedef sunucu için parolayı girin.
 4. Script, uzak sunucuya SSH bağlantısını kuracak, belirtilen dizini oluşturacak ve içine bir CSV dosyası oluşturup verileri yazacaktır.
 5. CSV dosyası başarıyla oluşturulduktan sonra, aynı dosya SFTP kullanılarak yerel bilgisayarınıza indirilecektir.
