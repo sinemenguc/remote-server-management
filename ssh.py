@@ -1,48 +1,67 @@
 import paramiko
 import csv
 
-def run_postgresql_query(ssh_client, service_name):
-    if service_name == "jira":
-        query = "SELECT * FROM urunler;"  #PostgreSQL Jira sorgusu
-    elif service_name == "conf":
-        query = "SELECT * FROM confluence_table;"  #PostgreSQL Confluence sorgusu
-    elif service_name == "bitbucket":
-        query = "SELECT * FROM bitbucket_table;"  #PostgreSQL Bitbucket sorgusu
+def list_databases(ssh_client, db_type):
+    if db_type == "pg":
+        command = "psql -U postgres -l"
+    elif db_type == "mysql":
+        command = "mysql -u debian -e 'SHOW DATABASES;'"
     else:
-        print("Hatalı servis seçimi.")
+        print("Hatalı veritabanı türü.")
         return
 
-    csv_file_path = "sonuc.csv"  #Uzak sunucuda oluşturulacak CSV dosyasının yolu
+    _, stdout, _ = ssh_client.exec_command(command)
+    databases = stdout.read().decode("utf-8")
 
-    #PostgreSQL sorgusunu çalıştır ve çıktısını CSV dosyasına yazdır
-    ssh_client.exec_command(f'psql -U postgres -d deneme -t -A -F"," -c "{query}" > {csv_file_path}')
+    print("Mevcut veritabanları:")
+    print(databases)
 
-    return csv_file_path
+def run_query(ssh_client, service_name, db_type, selected_database):
+    if db_type == "pg":
+        if service_name == "jira":
+            query = "SELECT * FROM urunler;"
+        elif service_name == "conf":
+            query = "SELECT * FROM users;"
+        elif service_name == "bitbucket":
+            query = "SELECT * FROM musteriler WHERE id = 3;"
+        else:
+            print("Hatalı servis seçimi.")
+            return
 
-def run_mysql_query(ssh_client, service_name):
-    if service_name == "jira":
-        query = "SELECT * FROM jira_table;"  #MySQL Jira sorgusu
-    elif service_name == "conf":
-        query = "SELECT * FROM confluence_table;"  #MySQL Confluence sorgusu
-    elif service_name == "bitbucket":
-        query = "SELECT * FROM bitbucket_table;"  #MySQL Bitbucket sorgusu
+        csv_file_path = "sonuc.csv"  #Uzak sunucuda oluşturulacak CSV dosyasının yolu
+
+        #PostgreSQL sorgusunu çalıştır ve çıktısını CSV dosyasına yazdır
+        ssh_client.exec_command(f'psql -U postgres -d {selected_database} -t -A -F"," -c "{query}" > {csv_file_path}')
+
+        return csv_file_path
+
+    elif db_type == "mysql":
+        if service_name == "jira":
+            query = "SELECT * FROM posts;"
+        elif service_name == "conf":
+            query = "SELECT * FROM confluence_table;"
+        elif service_name == "bitbucket":
+            query = "SELECT * FROM bitbucket_table;"
+        else:
+            print("Hatalı servis seçimi.")
+            return
+
+        csv_file_path = "mysqlsonuc.csv"  #Uzak sunucuda oluşturulacak CSV dosyasının yolu
+
+        #MySQL sorgusunu çalıştır ve çıktısını CSV dosyasına yazdır
+        mysql_command = f'mysql -u debian -D {selected_database} -e "{query}" > {csv_file_path}'
+        ssh_client.exec_command(mysql_command)
+        return csv_file_path
     else:
-        print("Hatalı servis seçimi.")
+        print("Hatalı veritabanı türü.")
         return
-
-    csv_file_path = "/tmp/data.csv"  #Uzak sunucuda oluşturulacak CSV dosyasının yolu
-
-    #MySQL sorgusunu çalıştır ve çıktısını CSV dosyasına yazdır
-    ssh_client.exec_command(f'mysql -u root -p -e "{query}" > {csv_file_path}')
-
-    return csv_file_path
 
 def ssh_connect():
-    remote_username = input("Lutfen hedef kullanici adini girin: ")
-    ip_address = input("Lutfen hedef IP adresini girin: ")
-    service_name = input("Lutfen hizmet adini girin (jira, bitbucket, conf): ")
-    db_type = input("Lutfen veritabani turunu girin (mysql, pg): ")
-    password = input(f"{remote_username}@{ip_address} icin parolanizi girin: ")
+    remote_username = input("Lütfen hedef kullanıcı adını girin: ")
+    ip_address = input("Lütfen hedef IP adresini girin: ")
+    service_name = input("Lütfen hizmet adını girin (jira, bitbucket, conf): ")
+    db_type = input("Lütfen veritabanı türünü girin (mysql, pg): ")
+    password = input(f"{remote_username}@{ip_address} için parolanızı girin: ")
 
     #Remote bağlantıyı oluşturmak için paramiko kullanımı
     ssh_client = paramiko.SSHClient()
@@ -50,41 +69,40 @@ def ssh_connect():
 
     try:
         #Girdileri kullanarak uzak sunucuya bağlantı sağlanıyor
-        print("SSH baglantisi kuruluyor...")
+        print("SSH bağlantısı kuruluyor...")
         ssh_client.connect(hostname=ip_address, username=remote_username, password=password, timeout=5)
-        print(f"{remote_username}@{ip_address} adresine baglanti basarili.")
+        print(f"{remote_username}@{ip_address} adresine bağlantı başarılı.")
 
-        #Sorguyu çalıştır ve çıktısını CSV dosyasına yazdır
-        if db_type == "pg":
-            csv_file_path = run_postgresql_query(ssh_client, service_name)
-        elif db_type == "mysql":
-            csv_file_path = run_mysql_query(ssh_client, service_name)
+        #Veritabanlarını listeleyelim
+        list_databases(ssh_client, db_type)
+
+        #İstediği veritabanına bağlanalım ve sorguyu çalıştıralım
+        selected_database = input("Lütfen bağlanmak istediğiniz veritabanını seçin: ")
+        if db_type == "pg" or db_type == "mysql":
+            csv_file_path = run_query(ssh_client, service_name, db_type, selected_database)
         else:
             print("Hatalı veritabanı türü.")
             ssh_client.close()
             return
 
-        #Olusturulan CSV dosyasini SFTP ile çekmek icin
-        print("CSV dosyası SFTP ile cekiliyor...")
+        #Olusturulan CSV dosyasini SFTP ile çekmek için...
+        print("CSV dosyası SFTP ile çekiliyor...")
         with paramiko.Transport((ip_address, 22)) as transport:
             transport.connect(username=remote_username, password=password)
             sftp = paramiko.SFTPClient.from_transport(transport)
             sftp.get(csv_file_path, "local_data.csv")
             sftp.close()
-        print("CSV dosyası basariyla cekildi.")
+        print("CSV dosyası başarıyla çekildi.")
 
-        #Debian sunucusunda kal
-        #print("SSH oturumu baslatılıyor...")
-        #subprocess.run(f"ssh {remote_username}@{ip_address}", shell=True, check=True)
     except paramiko.AuthenticationException:
-        print("Giris basarisiz. Kullanici adi veya sifre yanlis.")
+        print("Giriş başarısız. Kullanıcı adı veya şifre yanlış.")
     except paramiko.SSHException as e:
-        print(f"SSH Hatasi: {e}")
+        print(f"SSH Hatası: {e}")
     except Exception as e:
-        print(f"Hata olustu: {e}")
+        print(f"Hata oluştu: {e}")
     finally:
         ssh_client.close()
 
 if __name__ == "__main__":
-    print("Uzak sunucuya baglanma scriptine hosgeldiniz!")
+    print("Uzak sunucuya bağlanma scriptine hoş geldiniz!")
     ssh_connect()
